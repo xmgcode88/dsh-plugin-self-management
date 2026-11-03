@@ -148,6 +148,7 @@ window.__ModuleLoader__.load({
       'ai.from': '来自描述',
       'ai.failed': 'AI 整理失败',
       'ai.failedShort': 'AI 整理失败',
+      'ai.failedHint': '如果对话中已经收到 AI 回复，点「去对话」会自动读取；也可以直接重试。',
       'ai.retry': '重试',
       'ai.cancel': '取消',
       'ai.discard': '丢弃草稿',
@@ -289,6 +290,7 @@ window.__ModuleLoader__.load({
       'ai.from': 'From',
       'ai.failed': 'AI drafting failed',
       'ai.failedShort': 'AI drafting failed',
+      'ai.failedHint': 'If the AI already replied in the conversation, open the conversation to pick it up automatically; or simply retry.',
       'ai.retry': 'Retry',
       'ai.cancel': 'Cancel',
       'ai.discard': 'Discard draft',
@@ -1018,23 +1020,38 @@ window.__ModuleLoader__.load({
     }
 
     // Chat snapshots are scanned only in the session-scoped reminder strip.
-    // The selectors return primitives so identical chat state stays inert.
-    function selectLatestAssistantSeq(snapshot) {
-      try {
-        const order = snapshot && snapshot.order
-        const nodes = snapshot && snapshot.nodes
-        if (!Array.isArray(order) || !nodes || typeof nodes.get !== 'function') return 0
-        for (let i = order.length - 1; i >= 0; i -= 1) {
-          const node = nodes.get(order[i])
-          if (node && node.kind === 'assistant-step') return Math.max(0, Number(node.anchorSeq) || 0)
-        }
-      } catch {
-        /* chat snapshot shape changed; the AI flow stays dormant */
-      }
-      return 0
+    // Each selector returns one primitive, so unchanged chat state stays inert.
+    // The composite is `time\u0001seq\u0001text` because a later explanation
+    // must not hide an earlier structured reply.
+    function composeReply(node, text) {
+      const data = node && node.data
+      return String((data && data.time) || 0) + '\u0001' + String((node && node.anchorSeq) || 0) + '\u0001' + text
     }
 
-    function selectLatestAssistantText(snapshot) {
+    function parseReply(composite) {
+      if (!composite || typeof composite !== 'string') return null
+      const first = composite.indexOf('\u0001')
+      const second = composite.indexOf('\u0001', first + 1)
+      if (first < 1 || second < 0) return null
+      const time = Number(composite.slice(0, first)) || 0
+      const seq = Number(composite.slice(first + 1, second)) || 0
+      const text = composite.slice(second + 1)
+      if (!text) return null
+      return { time, seq, text }
+    }
+
+    function assistantText(node) {
+      const data = node && node.data
+      if (!data || data.status === 'running') return ''
+      const blocks = Array.isArray(data.blocks) ? data.blocks : []
+      return blocks
+        .filter((block) => block && block.kind === 'text' && typeof block.text === 'string')
+        .map((block) => block.text)
+        .join('\n')
+        .trim()
+    }
+
+    function selectLatestAssistantReply(snapshot) {
       try {
         const order = snapshot && snapshot.order
         const nodes = snapshot && snapshot.nodes
@@ -1042,14 +1059,25 @@ window.__ModuleLoader__.load({
         for (let i = order.length - 1; i >= 0; i -= 1) {
           const node = nodes.get(order[i])
           if (!node || node.kind !== 'assistant-step') continue
-          const data = node.data
-          if (!data || data.status === 'running') return ''
-          const blocks = Array.isArray(data.blocks) ? data.blocks : []
-          return blocks
-            .filter((block) => block && block.kind === 'text' && typeof block.text === 'string')
-            .map((block) => block.text)
-            .join('\n')
-            .trim()
+          const text = assistantText(node)
+          if (text) return composeReply(node, text)
+        }
+      } catch {
+        /* chat snapshot shape changed; the AI flow stays dormant */
+      }
+      return ''
+    }
+
+    function selectLatestDraftReply(snapshot) {
+      try {
+        const order = snapshot && snapshot.order
+        const nodes = snapshot && snapshot.nodes
+        if (!Array.isArray(order) || !nodes || typeof nodes.get !== 'function') return ''
+        for (let i = order.length - 1; i >= 0; i -= 1) {
+          const node = nodes.get(order[i])
+          if (!node || node.kind !== 'assistant-step') continue
+          const text = assistantText(node)
+          if (text && text.includes('{')) return composeReply(node, text)
         }
       } catch {
         /* chat snapshot shape changed; the AI flow stays dormant */
@@ -1538,7 +1566,7 @@ window.__ModuleLoader__.load({
             h(Btn, { variant: 'ghost', onClick: cancelAi }, t('ai.cancel')),
           ),
         ),
-        failed ? null : h('p', { className: 'sm-ai-card-hint' }, request.stage === 'pending' ? t('ai.waitingSubmit') : t('ai.waitingHint')),
+        failed ? h('p', { className: 'sm-ai-card-hint' }, t('ai.failedHint')) : h('p', { className: 'sm-ai-card-hint' }, request.stage === 'pending' ? t('ai.waitingSubmit') : t('ai.waitingHint')),
       )
     }
 
@@ -1749,14 +1777,14 @@ window.__ModuleLoader__.load({
       const inputActions = props.inputActions
       const useChat = props.useChat
       const useChatSafe = typeof useChat === 'function' ? useChat : null
-      const latestSeq = useChatSafe ? useChatSafe(selectLatestAssistantSeq) : 0
-      const latestText = useChatSafe ? useChatSafe(selectLatestAssistantText) : ''
+      const latestReply = useChatSafe ? useChatSafe(selectLatestAssistantReply) : ''
+      const draftReply = useChatSafe ? useChatSafe(selectLatestDraftReply) : ''
       const ai = data.ai
       const requestStage = ai && ai.request ? ai.request.stage : ''
       const requestAt = ai && ai.request ? ai.request.at : 0
 
       // A request created in the panel is submitted through this session's
-      // composer, then the reply is scanned for the structured JSON draft.
+      // composer; the reply is scanned for the structured JSON draft.
       useEffect(() => {
         if (requestStage !== 'pending' || !inputActions || !ai || !ai.request) return
         try {
@@ -1765,7 +1793,8 @@ window.__ModuleLoader__.load({
           failAiRequest()
           return
         }
-        markAiRequestSent(latestSeq, latestText)
+        const current = parseReply(latestReply)
+        markAiRequestSent(current ? current.seq : 0, current ? current.text : '')
         if (aiSubmitTimer) clearTimeout(aiSubmitTimer)
         aiSubmitTimer = setTimeout(() => {
           aiSubmitTimer = null
@@ -1775,35 +1804,51 @@ window.__ModuleLoader__.load({
             /* the prompt stays in the composer so Enter can be pressed */
           }
         }, 80)
-      }, [requestStage, requestAt, inputActions, latestSeq, latestText])
+      }, [requestStage, requestAt, inputActions, latestReply])
 
+      // Accept the draft while the request is waiting, and also after a
+      // timeout: a late reply is still useful, and chat history is scanned
+      // for the latest structured answer rather than only the newest text.
       useEffect(() => {
-        if (requestStage !== 'sent' || !latestText) return
-        const request = ai && ai.request
-        if (!request) return
-        const isNewer = latestSeq > (request.sinceSeq || 0) || latestText !== (request.sinceText || '')
-        if (!isNewer) return
-        const payload = extractAiPayload(latestText)
-        if (payload) {
-          saveAiDraft(payload)
-          return
+        if ((requestStage !== 'sent' && requestStage !== 'failed') || !ai || !ai.request) return
+        const request = ai.request
+        const draft = parseReply(draftReply)
+        const draftNewer =
+          draft !== null && (draft.time > (request.at || 0) || draft.seq > (request.sinceSeq || 0))
+        if (draftNewer) {
+          const payload = extractAiPayload(draft.text)
+          if (payload) {
+            saveAiDraft(payload)
+            return
+          }
+          if (requestStage === 'sent' && draft.text.includes('{')) {
+            failAiRequest()
+            return
+          }
         }
+        if (requestStage !== 'sent') return
+        const last = parseReply(latestReply)
+        if (!last) return
+        const lastNewer = last.time > (request.at || 0) || last.seq > (request.sinceSeq || 0)
+        if (!lastNewer || last.text === (request.sinceText || '')) return
         // A settled text that already tried to contain JSON but cannot be
         // parsed will not improve; small preamble steps still get retries.
-        if (latestText.includes('{')) {
+        if (last.text.includes('{')) {
           failAiRequest()
           return
         }
         if ((request.attempts || 0) + 1 >= 3) failAiRequest()
         else bumpAiAttempts()
-      }, [requestStage, latestText, latestSeq])
+      }, [requestStage, latestReply, draftReply, requestAt])
 
+      // A busy agent can queue the prompt for minutes; keep the request open
+      // long enough and allow a later reply to recover a timed-out request.
       useEffect(() => {
         if (requestStage !== 'sent') return undefined
         const timer = setTimeout(() => {
           const current = getData()
           if (current.ai && current.ai.request && current.ai.request.stage === 'sent') failAiRequest()
-        }, 150000)
+        }, 600000)
         return () => clearTimeout(timer)
       }, [requestStage, requestAt])
 
