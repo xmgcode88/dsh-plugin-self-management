@@ -1190,10 +1190,10 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'sm-chip' + (tone ? ' sm-chip-' + tone : '') }, children)
     }
 
-    function Card({ title, desc, actions, children }) {
+    function Card({ title, desc, actions, tone, children }) {
       return h(
         'section',
-        { className: 'sm-card' },
+        { className: 'sm-card' + (tone ? ' sm-card-' + tone : '') },
         title
           ? h(
               'div',
@@ -1427,7 +1427,7 @@ window.__ModuleLoader__.load({
       const urgency = todoUrgency(todo)
       return h(
         'div',
-        { className: 'sm-todo' + (todo.done ? ' sm-done' : '') },
+        { className: 'sm-todo' + (todo.done ? ' sm-done' : '') + (urgency ? ' sm-todo-' + urgency : '') },
         h('input', {
           type: 'checkbox',
           checked: todo.done,
@@ -1459,7 +1459,7 @@ window.__ModuleLoader__.load({
       const lastReview = item.reviews.length ? item.reviews[item.reviews.length - 1] : null
       return h(
         'article',
-        { className: 'sm-card sm-entity' },
+        { className: 'sm-card sm-entity sm-entity-red' },
         h(
           'div',
           { className: 'sm-entity-head' },
@@ -1489,7 +1489,7 @@ window.__ModuleLoader__.load({
       const isLink = /^https?:\/\//i.test(item.resource)
       return h(
         'article',
-        { className: 'sm-card sm-entity' },
+        { className: 'sm-card sm-entity sm-entity-green' },
         h(
           'div',
           { className: 'sm-entity-head' },
@@ -1653,10 +1653,11 @@ window.__ModuleLoader__.load({
           : learning
             ? { kind: 'learning', learning }
             : null
-      const stat = (label, value, tone) =>
+      const stat = (emoji, label, value, tone) =>
         h(
           'div',
-          { className: 'sm-stat' + (tone ? ' sm-stat-' + tone : '') },
+          { className: 'sm-stat sm-tone-' + tone },
+          h('div', { className: 'sm-stat-icon' }, emoji),
           h('div', { className: 'sm-stat-value' }, String(value)),
           h('div', { className: 'sm-stat-label' }, label),
         )
@@ -1730,10 +1731,10 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'sm-stats' },
-          stat(t('today.statOverdue'), counts.overdue, counts.overdue > 0 ? 'danger' : ''),
-          stat(t('today.statDueToday'), counts.dueToday, counts.dueToday > 0 ? 'warn' : ''),
-          stat(t('today.statStreak'), data.checkins.streak + ' ' + t('today.streakSuffix'), ''),
-          stat(t('today.statActive'), counts.active, ''),
+          stat('⏰', t('today.statOverdue'), counts.overdue, 'red'),
+          stat('📌', t('today.statDueToday'), counts.dueToday, 'amber'),
+          stat('🔥', t('today.statStreak'), data.checkins.streak + ' ' + t('today.streakSuffix'), 'green'),
+          stat('📋', t('today.statActive'), counts.active, 'blue'),
         ),
         h(
           'section',
@@ -1741,7 +1742,7 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'sm-focus-head' },
-            h('span', { className: 'sm-focus-kicker' }, t('today.focusKicker')),
+            h('span', { className: 'sm-focus-kicker' }, '🎯 ' + t('today.focusKicker')),
             checkedIn
               ? h(Chip, { tone: 'done' }, '✓ ' + t('today.checkinDone'))
               : h(Btn, { onClick: onCheckIn }, t('today.checkinButton')),
@@ -1756,7 +1757,7 @@ window.__ModuleLoader__.load({
         ),
         h(
           Card,
-          { title: t('today.todosTitle'), actions: h(Btn, { variant: 'ghost', onClick: () => onOpenTab('todos') }, t('today.openAll')) },
+          { title: '⚡ ' + t('today.todosTitle'), tone: 'blue', actions: h(Btn, { variant: 'ghost', onClick: () => onOpenTab('todos') }, t('today.openAll')) },
           todos.length === 0
             ? h(
                 'div',
@@ -1771,7 +1772,7 @@ window.__ModuleLoader__.load({
           { className: 'sm-grid' },
           h(
             Card,
-            { title: t('today.reminder') },
+            { title: '💪 ' + t('today.reminder'), tone: 'red' },
             reminder
               ? h(
                   'div',
@@ -1805,7 +1806,7 @@ window.__ModuleLoader__.load({
           ),
           h(
             Card,
-            { title: t('today.focusTitle'), actions: h(Btn, { variant: 'ghost', onClick: () => onOpenTab('learning') }, t('today.openAll')) },
+            { title: '📚 ' + t('today.focusTitle'), tone: 'green', actions: h(Btn, { variant: 'ghost', onClick: () => onOpenTab('learning') }, t('today.openAll')) },
             learning
               ? h(
                   'div',
@@ -2465,6 +2466,27 @@ window.__ModuleLoader__.load({
 .sm-focus-sub { margin: 0; font-size: 14px; color: var(--dsw-alias-label-secondary); }
 .sm-focus-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
 .sm-focus-actions .sm-btn-primary { font-size: 14px; padding: 8px 16px; }
+/* ---- v3: colorful category cards (theme-token tints only) ---- */
+.sm-tone-red { --sm-accent: var(--dsw-alias-state-error-primary); }
+.sm-tone-amber { --sm-accent: var(--dsw-alias-state-warn-primary); }
+.sm-tone-green { --sm-accent: var(--dsw-alias-state-success-primary); }
+.sm-tone-blue { --sm-accent: var(--dsw-alias-brand-primary); }
+.sm-card-red { border-top: 3px solid var(--dsw-alias-state-error-primary); }
+.sm-card-green { border-top: 3px solid var(--dsw-alias-state-success-primary); }
+.sm-card-blue { border-top: 3px solid var(--dsw-alias-brand-primary); }
+.sm-stat { background: color-mix(in srgb, var(--sm-accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--sm-accent) 32%, transparent); }
+.sm-stat-icon { font-size: 18px; line-height: 24px; }
+.sm-stat-value { color: var(--sm-accent); }
+.sm-stat-label { color: var(--dsw-alias-label-primary); opacity: .78; }
+.sm-focus-card { background: linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent), transparent 55%); }
+.sm-tab[aria-selected="true"] { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent); color: var(--dsw-alias-brand-primary); }
+.sm-entity-red { border-left: 3px solid var(--dsw-alias-state-error-primary); }
+.sm-entity-green { border-left: 3px solid var(--dsw-alias-state-success-primary); }
+.sm-todo-overdue, .sm-todo-today, .sm-todo-important { border-left: 3px solid var(--sm-accent, transparent); padding-left: 10px; border-radius: 8px; }
+.sm-todo-overdue { --sm-accent: var(--dsw-alias-state-error-primary); }
+.sm-todo-today { --sm-accent: var(--dsw-alias-state-warn-primary); }
+.sm-todo-important { --sm-accent: var(--dsw-alias-brand-primary); }
+.sm-ai-card { background: linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, transparent), transparent 60%); }
 @media (max-width: 720px) {
   .sm-root { padding: 0 16px 36px; }
   .sm-header { flex-direction: column; }
