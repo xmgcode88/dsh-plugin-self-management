@@ -1,0 +1,36 @@
+{
+  "format": 1,
+  "title": {
+    "en": "xmgcode88 DSH plugins"
+  },
+  "plugins": [
+    {
+      "name": "dsh-plugin-self-management",
+      "title": {
+        "en": "Self Management",
+        "zh": "自我管理"
+      },
+      "description": {
+        "en": "Track weaknesses, learning directions and to-dos; draft entries from one sentence with AI, confirm before saving, and keep a light reminder under the composer.",
+        "zh": "管理缺点、学习方向与待办；支持一句话让 AI 生成草稿、确认后写入，并在对话输入框下方持续提醒。"
+      },
+      "icon": "icons/icon.svg",
+      "author": "xmgcode88",
+      "homepage": "https://github.com/xmgcode88/dsh-plugin-self-management#readme",
+      "repository": {
+        "url": "https://github.com/xmgcode88/dsh-plugin-self-management"
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "publishTimestamp": 1793672469,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/xmgcode88/dsh-plugin-self-management",
+            "commit": "508d490f72a7c66e473b5a0a5fde776047cf37c5"
+          }
+        }
+      ]
+    }
+  ]
+}
