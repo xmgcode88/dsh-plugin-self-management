@@ -16,32 +16,41 @@
 
 ## 安装
 
-需要先安装 DeepSeek Harness（`dsh`）。
+需要先安装 DeepSeek Harness（`dsh`），并确定要安装到的 profile 名称（常见为 `web`，桌面版通常为 `desktop`；可用 `dsh profile list` 查看）。
 
 ### 从 GitHub 安装（推荐）
 
+使用固定标签（可复现）：
+
 ```sh
-dsh plugin add github:xmgcode88/dsh-plugin-self-management
+dsh plugin --profile web add "git+https://github.com/xmgcode88/dsh-plugin-self-management.git#v1.0.0"
 ```
 
-也可以使用固定提交：
+或安装默认分支最新版本：
 
 ```sh
-dsh plugin add "github:xmgcode88/dsh-plugin-self-management#<commit>"
+dsh plugin --profile web add "git+https://github.com/xmgcode88/dsh-plugin-self-management.git"
+```
+
+把 `web` 换成你的 profile 名称。如果本机只能通过 SSH 访问 GitHub，先执行一次：
+
+```sh
+git config --global url."git@github.com:".insteadOf "https://github.com/"
 ```
 
 安装后按 DSH 提示重启或刷新页面。侧边栏会出现一个靶心图标（在 Plugins、Schedules 下），点开即「自我管理」；对话输入框下方也会出现提醒条。
 
 ### 从插件管理页安装
 
-打开 DSH 的 **插件** 页面，使用「添加插件 / 安装插件」入口，填入上面的 GitHub 地址（或本仓库的 Git URL）安装。
+打开 DSH 的 **插件** 页面，使用「添加插件 / 安装插件」入口，填入本仓库的 Git 地址（`git+https://github.com/xmgcode88/dsh-plugin-self-management.git`）并选择 profile 安装。
 
 ### 本地开发
 
 ```sh
 git clone https://github.com/xmgcode88/dsh-plugin-self-management.git
-dsh plugin add ./dsh-plugin-self-management
+dsh plugin --profile web add ./dsh-plugin-self-management
 ```
+
 
 ## 使用
 
