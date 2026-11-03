@@ -1,0 +1,8 @@
+# Self-management bundle patch.
+# Inserts one Host row whose Client half owns the whole feature: a sidebar
+# panel icon, the central management panel, and the reminder strip under the
+# composer. The Host half holds no state; data lives in the browser profile.
+- insert:
+    - id: self-management
+      name: 'dsh-plugin-self-management'
+      config: {}
