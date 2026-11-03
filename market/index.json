@@ -22,8 +22,17 @@
       },
       "versions": [
         {
+          "version": "1.0.3",
+          "publishTimestamp": 1793676640,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/xmgcode88/dsh-plugin-self-management",
+            "commit": "a42e7be6fb5e7502b695f90a24ad85b069044e2f"
+          }
+        },
+        {
           "version": "1.0.2",
-          "publishTimestamp": 1793675218,
+          "publishTimestamp": 1793675200,
           "source": {
             "type": "git",
             "url": "https://github.com/xmgcode88/dsh-plugin-self-management",
