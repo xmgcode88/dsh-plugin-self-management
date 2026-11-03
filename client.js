@@ -42,17 +42,25 @@ window.__ModuleLoader__.load({
       'today.addWeakness': '添加缺点',
       'today.checkinDone': '今天已经提醒过自己',
       'today.checkinButton': '完成今日提醒',
-      'today.streakPrefix': '连续',
       'today.streakSuffix': '天',
-      'today.streakHint': '每天打开看一下，比偶尔下决心更有用。',
       'today.todosTitle': '今日待办',
       'today.todosEmpty': '今天没有必须完成的事，可以先推进学习方向。',
-      'today.overduePrefix': '已逾期',
-      'today.overdueSuffix': '项',
       'today.focusTitle': '学习焦点',
       'today.focusEmpty': '还没有学习方向，先定一个吧。',
       'today.openAll': '查看全部',
       'today.push': '推进 10%',
+      'today.statOverdue': '逾期',
+      'today.statDueToday': '今天到期',
+      'today.statStreak': '连续提醒',
+      'today.statActive': '待办未完成',
+      'today.focusKicker': '现在最该做的一件事',
+      'today.focusEmptyTitle': '从一件小事开始',
+      'today.focusEmptySub': '写下一条缺点或一个待办，这张卡片会告诉你下一步做什么。',
+      'today.focusActionTodo': '标记完成',
+      'today.addTodo': '添加待办',
+      'todo.overdueTag': '逾期',
+      'todo.todayTag': '今天',
+      'todo.importantTag': '重要',
       'weakness.title': '我的缺点',
       'weakness.desc': '写下它、看清它、给它一个可执行的动作。',
       'weakness.add': '添加缺点',
@@ -82,11 +90,9 @@ window.__ModuleLoader__.load({
       'todo.filterActive': '未完成',
       'todo.filterDone': '已完成',
       'todo.filterAll': '全部',
-      'todo.overdue': '逾期',
       'todo.duePrefix': '截止',
       'todo.priorityLabel': '优先级',
       'todo.confirmDelete': '确定删除这条待办吗？',
-      'todo.todayDue': '今天到期',
       'priority.high': '高',
       'priority.normal': '中',
       'priority.low': '低',
@@ -184,17 +190,25 @@ window.__ModuleLoader__.load({
       'today.addWeakness': 'Add weakness',
       'today.checkinDone': 'Already reminded yourself today',
       'today.checkinButton': 'Mark today done',
-      'today.streakPrefix': 'Streak',
       'today.streakSuffix': 'days',
-      'today.streakHint': 'Opening the panel daily beats occasional resolutions.',
       'today.todosTitle': 'Due today',
       'today.todosEmpty': 'Nothing due today. Push a learning goal instead.',
-      'today.overduePrefix': 'Overdue',
-      'today.overdueSuffix': 'items',
       'today.focusTitle': 'Learning focus',
       'today.focusEmpty': 'No learning direction yet. Pick one.',
       'today.openAll': 'View all',
       'today.push': 'Push +10%',
+      'today.statOverdue': 'Overdue',
+      'today.statDueToday': 'Due today',
+      'today.statStreak': 'Streak',
+      'today.statActive': 'Open to-dos',
+      'today.focusKicker': 'Do this now',
+      'today.focusEmptyTitle': 'Start with one small thing',
+      'today.focusEmptySub': 'Add a weakness or a to-do and this card will point to your next step.',
+      'today.focusActionTodo': 'Mark done',
+      'today.addTodo': 'Add to-do',
+      'todo.overdueTag': 'Overdue',
+      'todo.todayTag': 'Today',
+      'todo.importantTag': 'Important',
       'weakness.title': 'My weaknesses',
       'weakness.desc': 'Name it, see it clearly, give it an actionable move.',
       'weakness.add': 'Add weakness',
@@ -224,11 +238,9 @@ window.__ModuleLoader__.load({
       'todo.filterActive': 'Active',
       'todo.filterDone': 'Done',
       'todo.filterAll': 'All',
-      'todo.overdue': 'Overdue',
       'todo.duePrefix': 'Due',
       'todo.priorityLabel': 'Priority',
       'todo.confirmDelete': 'Delete this to-do?',
-      'todo.todayDue': 'Due today',
       'priority.high': 'High',
       'priority.normal': 'Medium',
       'priority.low': 'Low',
@@ -615,6 +627,61 @@ window.__ModuleLoader__.load({
     function dueTodos(todos) {
       const today = dayKey()
       return sortTodos(todos.filter((todo) => !todo.done && todo.due && todo.due <= today)).slice(0, 6)
+    }
+
+    function todoUrgency(todo) {
+      if (!todo || todo.done) return ''
+      const today = dayKey()
+      if (todo.due && todo.due < today) return 'overdue'
+      if (todo.due === today) return 'today'
+      if (todo.priority === 'high') return 'important'
+      return ''
+    }
+
+    function urgencyLabelKey(urgency) {
+      if (urgency === 'overdue') return 'todo.overdueTag'
+      if (urgency === 'today') return 'todo.todayTag'
+      if (urgency === 'important') return 'todo.importantTag'
+      return ''
+    }
+
+    function urgencyTone(urgency) {
+      if (urgency === 'overdue') return 'high'
+      if (urgency === 'today') return 'mid'
+      if (urgency === 'important') return 'brand'
+      return 'low'
+    }
+
+    function priorityOrder(todo) {
+      return PRIORITY_WEIGHT[todo.priority] === undefined ? 1 : PRIORITY_WEIGHT[todo.priority]
+    }
+
+    function activeTodos(data) {
+      const urgencyOrder = { overdue: 0, today: 1, important: 2, '': 3 }
+      return data.todos
+        .filter((todo) => !todo.done)
+        .sort((left, right) => {
+          const leftUrgency = urgencyOrder[todoUrgency(left)]
+          const rightUrgency = urgencyOrder[todoUrgency(right)]
+          if (leftUrgency !== rightUrgency) return leftUrgency - rightUrgency
+          if (left.due && right.due && left.due !== right.due) return left.due < right.due ? -1 : 1
+          if (left.due && !right.due) return -1
+          if (!left.due && right.due) return 1
+          return priorityOrder(left) - priorityOrder(right)
+        })
+    }
+
+    function topFocusTodo(data) {
+      return activeTodos(data).find((todo) => todoUrgency(todo) !== '') || null
+    }
+
+    function todayCounts(data) {
+      const today = dayKey()
+      return {
+        overdue: data.todos.filter((todo) => !todo.done && todo.due && todo.due < today).length,
+        dueToday: data.todos.filter((todo) => !todo.done && todo.due === today).length,
+        active: data.todos.filter((todo) => !todo.done).length,
+      }
     }
 
     function focusLearning(data) {
@@ -1357,7 +1424,7 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------------
     function TodoRow({ todo, t, onToggle, onEdit, onDelete }) {
       const overdue = !todo.done && todo.due && todo.due < dayKey()
-      const dueToday = !todo.done && todo.due === dayKey()
+      const urgency = todoUrgency(todo)
       return h(
         'div',
         { className: 'sm-todo' + (todo.done ? ' sm-done' : '') },
@@ -1374,10 +1441,9 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'sm-todo-meta' },
-            h(Chip, { tone: todo.priority === 'high' ? 'high' : todo.priority === 'low' ? 'low' : 'mid' }, t(priorityKey(todo.priority))),
+            urgency ? h(Chip, { tone: urgencyTone(urgency) }, t(urgencyLabelKey(urgency))) : null,
+            !urgency && todo.priority === 'high' ? h(Chip, { tone: 'high' }, t('priority.high')) : null,
             todo.due ? h('span', { className: overdue ? 'sm-overdue' : '' }, t('todo.duePrefix') + ' ' + formatDueDate(todo.due)) : null,
-            overdue ? h('span', { className: 'sm-overdue' }, t('todo.overdue')) : null,
-            dueToday ? h('span', null, t('todo.todayDue')) : null,
           ),
         ),
         h(
@@ -1573,98 +1639,193 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------------
     // Tabs
     // ---------------------------------------------------------------------
-    function TodayTab({ data, t, offset, onRotate, onCheckIn, onRecord, onProgress, onAddWeakness, onOpenTab, onToggleTodo }) {
+    function TodayTab({ data, t, offset, onRotate, onCheckIn, onRecord, onProgress, onAddWeakness, onAddTodo, onAddLearning, onOpenTab, onToggleTodo }) {
       const checkedIn = data.checkins.lastDate === dayKey()
       const reminder = pickReminder(data, offset)
-      const overdue = countOverdue(data.todos)
-      const todos = dueTodos(data.todos)
-      const focus = focusLearning(data)
+      const counts = todayCounts(data)
+      const todos = activeTodos(data).slice(0, 5)
+      const learning = focusLearning(data)
+      const focusTodo = topFocusTodo(data)
+      const focus = focusTodo
+        ? { kind: 'todo', todo: focusTodo }
+        : reminder
+          ? { kind: 'weakness', weakness: reminder }
+          : learning
+            ? { kind: 'learning', learning }
+            : null
+      const stat = (label, value, tone) =>
+        h(
+          'div',
+          { className: 'sm-stat' + (tone ? ' sm-stat-' + tone : '') },
+          h('div', { className: 'sm-stat-value' }, String(value)),
+          h('div', { className: 'sm-stat-label' }, label),
+        )
+      let focusTitle = t('today.focusEmptyTitle')
+      let focusMeta = null
+      let focusAction = null
+      let focusActions = null
+      if (focus && focus.kind === 'todo') {
+        const urgency = todoUrgency(focus.todo)
+        focusTitle = focus.todo.title
+        focusMeta = h(
+          'div',
+          { className: 'sm-focus-meta' },
+          urgency ? h(Chip, { tone: urgencyTone(urgency) }, t(urgencyLabelKey(urgency))) : null,
+          focus.todo.due ? h(Chip, null, t('todo.duePrefix') + ' ' + formatDueDate(focus.todo.due)) : null,
+        )
+        focusActions = h(
+          'div',
+          { className: 'sm-focus-actions' },
+          h(Btn, { variant: 'primary', onClick: () => onToggleTodo(focus.todo.id) }, t('today.focusActionTodo')),
+          h(Btn, { onClick: () => onOpenTab('todos') }, t('today.openAll')),
+        )
+      } else if (focus && focus.kind === 'weakness') {
+        focusTitle = focus.weakness.title
+        focusMeta = h(
+          'div',
+          { className: 'sm-focus-meta' },
+          h(Chip, { tone: severityTone(focus.weakness.severity) }, t(severityKey(focus.weakness.severity))),
+          focus.weakness.trigger ? h(Chip, null, focus.weakness.trigger) : null,
+        )
+        focusAction = focus.weakness.action
+          ? h('div', { className: 'sm-focus-action' }, h('b', null, t('weakness.actionLabel')), ' ' + focus.weakness.action)
+          : null
+        focusActions = h(
+          'div',
+          { className: 'sm-focus-actions' },
+          h(Btn, { variant: 'primary', onClick: () => onRecord(focus.weakness.id) }, t('today.record')),
+          h(Btn, { onClick: onRotate }, t('today.rotate')),
+          h('span', { className: 'sm-muted' }, t('today.reviewPrefix') + ' ' + focus.weakness.reviews.length + ' ' + t('today.reviewSuffix')),
+        )
+      } else if (focus && focus.kind === 'learning') {
+        focusTitle = focus.learning.title
+        focusMeta = h('div', { className: 'sm-focus-meta' }, h(Chip, null, t('learning.progressLabel') + ' ' + focus.learning.progress + '%'))
+        focusAction = focus.learning.goal
+          ? h('div', { className: 'sm-focus-action' }, h('b', null, t('learning.goalLabel')), ' ' + focus.learning.goal)
+          : null
+        focusActions = h(
+          'div',
+          { className: 'sm-focus-actions' },
+          h(Btn, { variant: 'primary', onClick: () => onProgress(focus.learning.id, Math.min(100, focus.learning.progress + 10)) }, t('today.push')),
+          h(Btn, { onClick: () => onOpenTab('learning') }, t('today.openAll')),
+        )
+      } else {
+        focusMeta = h('p', { className: 'sm-focus-sub' }, t('today.focusEmptySub'))
+        focusActions = h(
+          'div',
+          { className: 'sm-focus-actions' },
+          h(Btn, { variant: 'primary', onClick: onAddWeakness }, t('today.addWeakness')),
+          h(Btn, { onClick: onAddTodo }, t('today.addTodo')),
+        )
+      }
       return h(
         'div',
         { className: 'sm-content' },
         h(
+          'div',
+          { className: 'sm-dayline' },
+          h('span', { className: 'sm-dayline-date' }, formatToday()),
+          h('span', { className: 'sm-dayline-greeting' }, t('today.greeting')),
+        ),
+        h(
+          'div',
+          { className: 'sm-stats' },
+          stat(t('today.statOverdue'), counts.overdue, counts.overdue > 0 ? 'danger' : ''),
+          stat(t('today.statDueToday'), counts.dueToday, counts.dueToday > 0 ? 'warn' : ''),
+          stat(t('today.statStreak'), data.checkins.streak + ' ' + t('today.streakSuffix'), ''),
+          stat(t('today.statActive'), counts.active, ''),
+        ),
+        h(
           'section',
-          { className: 'sm-card sm-hero' },
+          { className: 'sm-focus-card' },
           h(
             'div',
-            { className: 'sm-hero-main' },
-            h('div', { className: 'sm-hero-date' }, formatToday()),
-            h('div', { className: 'sm-hero-greeting' }, t('today.greeting')),
-          ),
-          h(
-            'div',
-            { className: 'sm-hero-side' },
+            { className: 'sm-focus-head' },
+            h('span', { className: 'sm-focus-kicker' }, t('today.focusKicker')),
             checkedIn
               ? h(Chip, { tone: 'done' }, '✓ ' + t('today.checkinDone'))
-              : h(Btn, { variant: 'primary', onClick: onCheckIn }, t('today.checkinButton')),
-            h('div', { className: 'sm-streak' }, t('today.streakPrefix') + ' ' + data.checkins.streak + ' ' + t('today.streakSuffix')),
-            h('div', { className: 'sm-streak-hint' }, t('today.streakHint')),
+              : h(Btn, { onClick: onCheckIn }, t('today.checkinButton')),
           ),
+          h('div', { className: 'sm-focus-title' }, focusTitle),
+          focusMeta,
+          focusAction,
+          focus && focus.kind === 'learning'
+            ? h('div', { className: 'sm-progress-row' }, h('div', { className: 'sm-progress' }, h('span', { style: { width: focus.learning.progress + '%' } })))
+            : null,
+          focusActions,
         ),
         h(
           Card,
-          { title: t('today.reminder') },
-          reminder
+          { title: t('today.todosTitle'), actions: h(Btn, { variant: 'ghost', onClick: () => onOpenTab('todos') }, t('today.openAll')) },
+          todos.length === 0
             ? h(
                 'div',
-                { className: 'sm-reminder' },
-                h(
-                  'div',
-                  { className: 'sm-entity-head' },
-                  h('div', { className: 'sm-entity-title sm-reminder-title' }, reminder.title),
-                  h(
-                    'div',
-                    { className: 'sm-entity-chips' },
-                    h(Chip, { tone: severityTone(reminder.severity) }, t(severityKey(reminder.severity))),
-                    reminder.trigger ? h(Chip, null, reminder.trigger) : null,
-                  ),
-                ),
-                reminder.action ? h('div', { className: 'sm-kv' }, h('b', null, t('weakness.actionLabel')), ' ' + reminder.action) : null,
-                reminder.note ? h('p', { className: 'sm-entity-note' }, reminder.note) : null,
-                h(
-                  'div',
-                  { className: 'sm-reminder-actions' },
-                  h(Btn, { onClick: onRotate }, t('today.rotate')),
-                  h(Btn, { variant: 'primary', onClick: () => onRecord(reminder.id) }, t('today.record')),
-                  h('span', { className: 'sm-muted' }, t('today.reviewPrefix') + ' ' + reminder.reviews.length + ' ' + t('today.reviewSuffix')),
-                ),
-              )
-            : h(
-                'div',
                 { className: 'sm-empty' },
-                h('p', null, t('today.empty')),
-                h(Btn, { variant: 'primary', onClick: onAddWeakness }, t('today.addWeakness')),
-              ),
+                h('p', null, t('today.todosEmpty')),
+                h(Btn, { variant: 'primary', onClick: onAddTodo }, t('today.addTodo')),
+              )
+            : todos.map((todo) => h(TodoRow, { key: todo.id, todo, t, onToggle: onToggleTodo })),
         ),
         h(
           'div',
           { className: 'sm-grid' },
           h(
             Card,
-            { title: t('today.todosTitle'), actions: h(Btn, { variant: 'ghost', onClick: () => onOpenTab('todos') }, t('today.openAll')) },
-            overdue > 0 ? h('div', { className: 'sm-overdue-count' }, t('today.overduePrefix') + ' ' + overdue + ' ' + t('today.overdueSuffix')) : null,
-            todos.length === 0
-              ? h('div', { className: 'sm-empty' }, t('today.todosEmpty'))
-              : todos.map((todo) => h(TodoRow, { key: todo.id, todo, t, onToggle: onToggleTodo })),
+            { title: t('today.reminder') },
+            reminder
+              ? h(
+                  'div',
+                  { className: 'sm-reminder' },
+                  h(
+                    'div',
+                    { className: 'sm-entity-head' },
+                    h('div', { className: 'sm-entity-title sm-reminder-title' }, reminder.title),
+                    h(
+                      'div',
+                      { className: 'sm-entity-chips' },
+                      h(Chip, { tone: severityTone(reminder.severity) }, t(severityKey(reminder.severity))),
+                      reminder.trigger ? h(Chip, null, reminder.trigger) : null,
+                    ),
+                  ),
+                  reminder.action ? h('div', { className: 'sm-kv' }, h('b', null, t('weakness.actionLabel')), ' ' + reminder.action) : null,
+                  h(
+                    'div',
+                    { className: 'sm-reminder-actions' },
+                    h(Btn, { variant: 'primary', onClick: () => onRecord(reminder.id) }, t('today.record')),
+                    h(Btn, { onClick: onRotate }, t('today.rotate')),
+                    h('span', { className: 'sm-muted' }, t('today.reviewPrefix') + ' ' + reminder.reviews.length + ' ' + t('today.reviewSuffix')),
+                  ),
+                )
+              : h(
+                  'div',
+                  { className: 'sm-empty' },
+                  h('p', null, t('today.empty')),
+                  h(Btn, { variant: 'primary', onClick: onAddWeakness }, t('today.addWeakness')),
+                ),
           ),
           h(
             Card,
             { title: t('today.focusTitle'), actions: h(Btn, { variant: 'ghost', onClick: () => onOpenTab('learning') }, t('today.openAll')) },
-            focus
+            learning
               ? h(
                   'div',
                   { className: 'sm-focus' },
-                  h('div', { className: 'sm-entity-title' }, focus.title),
-                  focus.goal ? h('p', { className: 'sm-entity-note' }, focus.goal) : null,
+                  h('div', { className: 'sm-entity-title' }, learning.title),
+                  learning.goal ? h('p', { className: 'sm-entity-note' }, learning.goal) : null,
                   h(
                     'div',
                     { className: 'sm-progress-row' },
-                    h('div', { className: 'sm-progress' }, h('span', { style: { width: focus.progress + '%' } })),
-                    h('span', { className: 'sm-muted' }, focus.progress + '%'),
+                    h('div', { className: 'sm-progress' }, h('span', { style: { width: learning.progress + '%' } })),
+                    h('span', { className: 'sm-muted' }, learning.progress + '%'),
                   ),
-                  h(Btn, { onClick: () => onProgress(focus.id, Math.min(100, focus.progress + 10)) }, t('today.push')),
+                  h(Btn, { onClick: () => onProgress(learning.id, Math.min(100, learning.progress + 10)) }, t('today.push')),
                 )
-              : h('div', { className: 'sm-empty' }, t('today.focusEmpty')),
+              : h(
+                  'div',
+                  { className: 'sm-empty' },
+                  h('p', null, t('today.focusEmpty')),
+                  h(Btn, { variant: 'primary', onClick: onAddLearning }, t('learning.add')),
+                ),
           ),
         ),
       )
@@ -1681,7 +1842,12 @@ window.__ModuleLoader__.load({
           h(Btn, { variant: 'primary', onClick: onAdd }, '+ ' + t('weakness.add')),
         ),
         data.weaknesses.length === 0
-          ? h('div', { className: 'sm-card sm-empty' }, t('weakness.empty'))
+          ? h(
+              'div',
+              { className: 'sm-card sm-empty' },
+              h('p', null, t('weakness.empty')),
+              h(Btn, { variant: 'primary', onClick: onAdd }, '+ ' + t('weakness.add')),
+            )
           : data.weaknesses.map((item) => h(WeaknessCard, { key: item.id, item, t, onEdit, onDelete, onRecord })),
       )
     }
@@ -1697,7 +1863,12 @@ window.__ModuleLoader__.load({
           h(Btn, { variant: 'primary', onClick: onAdd }, '+ ' + t('learning.add')),
         ),
         data.learning.length === 0
-          ? h('div', { className: 'sm-card sm-empty' }, t('learning.empty'))
+          ? h(
+              'div',
+              { className: 'sm-card sm-empty' },
+              h('p', null, t('learning.empty')),
+              h(Btn, { variant: 'primary', onClick: onAdd }, '+ ' + t('learning.add')),
+            )
           : data.learning.map((item) => h(LearningCard, { key: item.id, item, t, onEdit, onDelete, onProgress })),
       )
     }
@@ -1972,9 +2143,9 @@ window.__ModuleLoader__.load({
 
       const tabs = [
         { id: 'today', label: t('tab.today') },
-        { id: 'weaknesses', label: t('tab.weaknesses') },
-        { id: 'learning', label: t('tab.learning') },
-        { id: 'todos', label: t('tab.todos') },
+        { id: 'weaknesses', label: t('tab.weaknesses'), count: data.weaknesses.length },
+        { id: 'learning', label: t('tab.learning'), count: data.learning.length },
+        { id: 'todos', label: t('tab.todos'), count: data.todos.filter((todo) => !todo.done).length },
       ]
 
       let body = null
@@ -1988,6 +2159,8 @@ window.__ModuleLoader__.load({
           onRecord: recordWeaknessImprovement,
           onProgress: setLearningProgress,
           onAddWeakness: () => setDialog({ type: 'weakness', item: null }),
+          onAddTodo: () => setDialog({ type: 'todo', item: null }),
+          onAddLearning: () => setDialog({ type: 'learning', item: null }),
           onOpenTab: setTab,
           onToggleTodo: toggleTodo,
         })
@@ -2095,6 +2268,7 @@ window.__ModuleLoader__.load({
                   onClick: () => setTab(entry.id),
                 },
                 entry.label,
+                entry.count ? h('span', { className: 'sm-tab-count' }, String(entry.count)) : null,
               ),
             ),
           ),
@@ -2241,6 +2415,56 @@ window.__ModuleLoader__.load({
 .sm-ai-item-sub { margin-top: 2px; font-size: 11.5px; color: var(--dsw-alias-label-secondary); word-break: break-word; }
 .sm-ai-form-hint { margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--dsw-alias-label-secondary); }
 .sm-dock-ai { border-color: var(--dsw-alias-brand-primary); }
+/* ---- v2: clearer hierarchy, larger type, focus-first layout ---- */
+.sm-root { font-size: 14px; line-height: 1.6; gap: 18px; }
+.sm-header { padding-top: 30px; }
+.sm-title { font-size: 24px; line-height: 32px; font-weight: 600; }
+.sm-subtitle { font-size: 14px; line-height: 22px; }
+.sm-note { font-size: 12.5px; line-height: 18px; }
+.sm-toolbar .sm-btn { border-color: transparent; background: transparent; color: var(--dsw-alias-label-secondary); }
+.sm-toolbar .sm-btn:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
+.sm-toolbar .sm-btn-primary { border-color: var(--dsw-alias-brand-primary); background: transparent; color: var(--dsw-alias-brand-primary); font-weight: 600; }
+.sm-toolbar .sm-btn-danger { color: var(--dsw-alias-state-error-primary); }
+.sm-tabs { padding: 4px; border-radius: 10px; gap: 4px; }
+.sm-tab { font-size: 14px; line-height: 22px; padding: 6px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; }
+.sm-tab-count { font-size: 12px; line-height: 18px; padding: 0 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
+.sm-tab[aria-selected="true"] .sm-tab-count { background: transparent; color: var(--dsw-alias-brand-primary); font-weight: 600; }
+.sm-btn { font-size: 13px; padding: 7px 12px; border-radius: 8px; }
+.sm-btn-primary { font-weight: 600; }
+.sm-card { border-radius: 12px; padding: 16px 18px; }
+.sm-card-title { font-size: 15px; }
+.sm-section-title { font-size: 18px; line-height: 26px; }
+.sm-section-desc { font-size: 13px; }
+.sm-entity-title { font-size: 15px; }
+.sm-kv { font-size: 13px; }
+.sm-chip { font-size: 12px; line-height: 18px; padding: 2px 9px; }
+.sm-chip-brand { color: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); }
+.sm-empty { font-size: 13.5px; }
+.sm-input, .sm-textarea, .sm-select { font-size: 14px; padding: 8px 10px; }
+.sm-todo-title { font-size: 14px; }
+.sm-todo input[type="checkbox"] { width: 17px; height: 17px; }
+.sm-todo-meta { font-size: 12px; }
+.sm-dialog-title { font-size: 16px; }
+.sm-ai-card-title { font-size: 15px; }
+.sm-dayline { width: 100%; max-width: 960px; display: flex; align-items: baseline; gap: 12px; }
+.sm-dayline-date { font-size: 16px; font-weight: 700; }
+.sm-dayline-greeting { font-size: 13px; color: var(--dsw-alias-label-secondary); }
+.sm-stats { width: 100%; max-width: 960px; box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.sm-stat { background: var(--dsw-alias-bg-layer-1); border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px; padding: 12px 16px; }
+.sm-stat-value { font-size: 26px; line-height: 34px; font-weight: 700; }
+.sm-stat-label { margin-top: 2px; font-size: 12.5px; color: var(--dsw-alias-label-secondary); }
+.sm-stat-danger .sm-stat-value { color: var(--dsw-alias-state-error-primary); }
+.sm-stat-warn .sm-stat-value { color: var(--dsw-alias-state-warn-primary); }
+.sm-focus-card { width: 100%; max-width: 960px; box-sizing: border-box; background: var(--dsw-alias-bg-layer-1); border: 1px solid var(--dsw-alias-brand-primary); border-left-width: 4px; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.sm-focus-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sm-focus-kicker { font-size: 13px; font-weight: 700; color: var(--dsw-alias-brand-primary); letter-spacing: .02em; }
+.sm-focus-title { font-size: 22px; line-height: 30px; font-weight: 700; word-break: break-word; }
+.sm-focus-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sm-focus-action { font-size: 14px; color: var(--dsw-alias-label-secondary); }
+.sm-focus-action b { color: var(--dsw-alias-label-primary); font-weight: 500; }
+.sm-focus-sub { margin: 0; font-size: 14px; color: var(--dsw-alias-label-secondary); }
+.sm-focus-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.sm-focus-actions .sm-btn-primary { font-size: 14px; padding: 8px 16px; }
 @media (max-width: 720px) {
   .sm-root { padding: 0 16px 36px; }
   .sm-header { flex-direction: column; }

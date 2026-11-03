@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-self-management",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Self-management for DeepSeek Harness: track weaknesses, learning directions and to-dos, draft entries from one sentence with AI, and keep an ambient reminder under the composer.",
   "license": "MIT",
   "author": "xmgcode88",
