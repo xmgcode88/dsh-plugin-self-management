@@ -177,7 +177,7 @@ window.__ModuleLoader__.load({
       'ai.adviceMetric': '进步信号',
       'ai.adviceReady': '已生成专家指导。',
       'ai.adviceTargetMissing': '这条缺点已不存在，指导未保存。',
-      'ai.advicePromptBefore': '你是行为改变教练。针对下面这个缺点，给出专业、共情且可执行的改进方案。只输出一个 json 代码块，不要任何解释。对象字段：why（为什么难改的一句话解释）、action（具体的替代动作）、habit（每天两分钟以内的微习惯）、steps（恰好三条今天能做的步骤）、metric（一个可观察的进步信号）。建议要小、具体、现实，不要责备。缺点信息：',
+      'ai.advicePromptBefore': '你是行为改变教练。针对下面这个缺点，给出专业、共情且可执行的改进方案。输出格式：第一行写一句人话「✅ 指导已生成，请回到自我管理面板查看」，然后输出一个 json 代码块（数据包，插件会自动读取），代码块之后不要写任何内容。对象字段：why（为什么难改的一句话解释）、action（具体的替代动作）、habit（每天两分钟以内的微习惯）、steps（恰好三条今天能做的步骤）、metric（一个可观察的进步信号）。建议要小、具体、现实，不要责备。缺点信息：',
       'ai.promptBefore': '请把下面这句自我管理描述整理成结构化草稿，只用于我的「自我管理」插件。只输出一个 ```json 代码块，不要任何解释或前后缀。JSON 形状：{"weaknesses":[{"title":"","note":"","trigger":"","action":"","severity":2}],"learning":[{"title":"","goal":"","resource":"","note":"","progress":0}],"todos":[{"title":"","priority":"normal","due":""}]}。规则：只生成描述真正涉及的类别，其余数组留空；severity 3 最严重、1 最轻；priority 取 high/normal/low；due 只在描述提到日期时写 YYYY-MM-DD，否则空字符串。描述：',
     }
 
@@ -335,7 +335,7 @@ window.__ModuleLoader__.load({
       'ai.adviceMetric': 'Progress signal',
       'ai.adviceReady': 'Expert guidance added.',
       'ai.adviceTargetMissing': 'This weakness no longer exists; guidance was not saved.',
-      'ai.advicePromptBefore': 'You are a behavior-change coach. Give empathetic, practical guidance for the weakness below. Output only one json code block, with no explanation. Object fields: why (one sentence on why change is hard), action (a specific replacement behavior), habit (a micro-habit under two minutes daily), steps (exactly three steps doable today), metric (one observable sign of progress). Keep it small, concrete, realistic, and nonjudgmental. Weakness:',
+      'ai.advicePromptBefore': 'You are a behavior-change coach. Give empathetic, practical guidance for the weakness below. Output format: first one human sentence "Guidance ready — check the Self Management panel", then one json code block (a data payload the plugin reads automatically), and nothing after it. Object fields: why (one sentence on why change is hard), action (a specific replacement behavior), habit (a micro-habit under two minutes daily), steps (exactly three steps doable today), metric (one observable sign of progress). Keep it small, concrete, realistic, and nonjudgmental. Weakness:',
       'ai.promptBefore': 'Turn the sentence below into a structured draft for my "Self Management" plugin. Output ONLY one ```json code block, no explanation or extra text. JSON shape: {"weaknesses":[{"title":"","note":"","trigger":"","action":"","severity":2}],"learning":[{"title":"","goal":"","resource":"","note":"","progress":0}],"todos":[{"title":"","priority":"normal","due":""}]}. Rules: only include categories the sentence is really about, leave the others empty; severity 3 is worst and 1 is mildest; priority is high/normal/low; due is YYYY-MM-DD only when a date is mentioned, otherwise an empty string. Description:',
     }
 
@@ -2646,6 +2646,38 @@ window.__ModuleLoader__.load({
 .sm-advice-step-no { flex: none; width: 20px; height: 20px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--dsw-alias-bg-base); background: var(--dsw-alias-state-error-primary); }
 .sm-advice-metric { font-size: 13px; color: var(--dsw-alias-label-secondary); }
 .sm-advice-metric b { color: var(--dsw-alias-label-primary); font-weight: 600; margin-right: 6px; }
+/* ---- v5: vivid pastel palette, explicit light/dark ---- */
+.sm-root { --c-red:#DC2626; --c-red-bg:#FEE2E2; --c-amber:#D97706; --c-amber-bg:#FEF3C7; --c-green:#059669; --c-green-bg:#D1FAE5; --c-blue:#2563EB; --c-blue-bg:#DBEAFE; --c-purple:#7C3AED; --c-purple-bg:#EDE9FE; }
+@media (prefers-color-scheme: dark) {
+  .sm-root { --c-red:#F87171; --c-red-bg:#3B1515; --c-amber:#FBBF24; --c-amber-bg:#3B2E0E; --c-green:#34D399; --c-green-bg:#0E2E22; --c-blue:#60A5FA; --c-blue-bg:#152238; --c-purple:#A78BFA; --c-purple-bg:#241A3B; }
+}
+.sm-tone-red { --sm-accent: var(--c-red); --sm-accent-bg: var(--c-red-bg); }
+.sm-tone-amber { --sm-accent: var(--c-amber); --sm-accent-bg: var(--c-amber-bg); }
+.sm-tone-green { --sm-accent: var(--c-green); --sm-accent-bg: var(--c-green-bg); }
+.sm-tone-blue { --sm-accent: var(--c-blue); --sm-accent-bg: var(--c-blue-bg); }
+.sm-stat { background: var(--sm-accent-bg); border: 1px solid var(--sm-accent); }
+.sm-stat-value { color: var(--sm-accent); }
+.sm-stat-label { color: var(--dsw-alias-label-primary); opacity: .8; }
+.sm-card-red { background: var(--c-red-bg); border-top: 4px solid var(--c-red); border-color: var(--c-red-bg); }
+.sm-card-green { background: var(--c-green-bg); border-top: 4px solid var(--c-green); border-color: var(--c-green-bg); }
+.sm-card-blue { background: var(--c-blue-bg); border-top: 4px solid var(--c-blue); border-color: var(--c-blue-bg); }
+.sm-entity-red { background: var(--c-red-bg); border-left: 4px solid var(--c-red); border-color: var(--c-red-bg); }
+.sm-entity-green { background: var(--c-green-bg); border-left: 4px solid var(--c-green); border-color: var(--c-green-bg); }
+.sm-todo-overdue { background: var(--c-red-bg); border-left-color: var(--c-red); }
+.sm-todo-today { background: var(--c-amber-bg); border-left-color: var(--c-amber); }
+.sm-todo-important { background: var(--c-blue-bg); border-left-color: var(--c-blue); }
+.sm-focus-card { background: linear-gradient(135deg, var(--c-blue-bg), transparent 75%); border: 2px solid var(--c-blue); border-radius: 16px; }
+.sm-focus-kicker { color: var(--c-blue); font-size: 14px; }
+.sm-focus-title { font-size: 24px; }
+.sm-tab[aria-selected="true"] { background: var(--c-blue-bg); color: var(--c-blue); font-weight: 600; }
+.sm-ai-card { background: linear-gradient(135deg, var(--c-purple-bg), transparent 70%); border-top: 4px solid var(--c-purple); }
+.sm-ai-card-title { color: var(--c-purple); }
+.sm-chip-brand { color: var(--c-purple); border-color: var(--c-purple); }
+.sm-btn-primary { background: var(--c-blue); border-color: var(--c-blue); color: #FFFFFF; font-weight: 600; }
+.sm-btn-primary:hover { background: var(--c-blue); opacity: .88; }
+.sm-advice { background: var(--dsw-alias-bg-overlay); border: 1px solid var(--c-red); }
+.sm-advice-action b { color: var(--c-red); }
+.sm-advice-step-no { background: var(--c-red); }
 @media (max-width: 720px) {
   .sm-root { padding: 0 16px 36px; }
   .sm-header { flex-direction: column; }
