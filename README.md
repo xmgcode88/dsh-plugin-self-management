@@ -23,7 +23,7 @@
 使用固定标签（可复现）：
 
 ```sh
-dsh plugin --profile web add "git+https://github.com/xmgcode88/dsh-plugin-self-management.git#v1.0.3"
+dsh plugin --profile web add "git+https://github.com/xmgcode88/dsh-plugin-self-management.git#v1.0.4"
 ```
 
 或安装默认分支最新版本：

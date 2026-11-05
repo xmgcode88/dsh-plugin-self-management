@@ -67,6 +67,7 @@ window.__ModuleLoader__.load({
       'weakness.empty': '还没有记录。缺点不是用来自责的，是用来设计的。',
       'weakness.record': '记录一次改进',
       'severity.label': '严重程度',
+      'weakness.coached': '已获指导',
       'weakness.noteLabel': '描述',
       'weakness.triggerLabel': '触发场景',
       'weakness.actionLabel': '改进动作',
@@ -168,6 +169,15 @@ window.__ModuleLoader__.load({
       'ai.todo': '待办',
       'ai.dockReady': '去面板确认这次生成的条目',
       'ai.dockWaiting': '等待 AI 生成草稿',
+      'ai.coach': '✨ 获取改进指导',
+      'ai.recoach': '重新指导',
+      'ai.coached': '已获指导',
+      'ai.adviceAction': '建议行动',
+      'ai.adviceSteps': '今天可以做这三步',
+      'ai.adviceMetric': '进步信号',
+      'ai.adviceReady': '已生成专家指导。',
+      'ai.adviceTargetMissing': '这条缺点已不存在，指导未保存。',
+      'ai.advicePromptBefore': '你是行为改变教练。针对下面这个缺点，给出专业、共情且可执行的改进方案。只输出一个 json 代码块，不要任何解释。对象字段：why（为什么难改的一句话解释）、action（具体的替代动作）、habit（每天两分钟以内的微习惯）、steps（恰好三条今天能做的步骤）、metric（一个可观察的进步信号）。建议要小、具体、现实，不要责备。缺点信息：',
       'ai.promptBefore': '请把下面这句自我管理描述整理成结构化草稿，只用于我的「自我管理」插件。只输出一个 ```json 代码块，不要任何解释或前后缀。JSON 形状：{"weaknesses":[{"title":"","note":"","trigger":"","action":"","severity":2}],"learning":[{"title":"","goal":"","resource":"","note":"","progress":0}],"todos":[{"title":"","priority":"normal","due":""}]}。规则：只生成描述真正涉及的类别，其余数组留空；severity 3 最严重、1 最轻；priority 取 high/normal/low；due 只在描述提到日期时写 YYYY-MM-DD，否则空字符串。描述：',
     }
 
@@ -215,6 +225,7 @@ window.__ModuleLoader__.load({
       'weakness.empty': 'Nothing yet. A weakness is a design problem, not a verdict.',
       'weakness.record': 'Record an improvement',
       'severity.label': 'Severity',
+      'weakness.coached': 'Guided',
       'weakness.noteLabel': 'Description',
       'weakness.triggerLabel': 'Triggers',
       'weakness.actionLabel': 'Improvement move',
@@ -316,6 +327,15 @@ window.__ModuleLoader__.load({
       'ai.todo': 'To-do',
       'ai.dockReady': 'Open the panel to confirm the generated entries',
       'ai.dockWaiting': 'Waiting for the AI draft',
+      'ai.coach': '✨ Get expert guidance',
+      'ai.recoach': 'Refresh guidance',
+      'ai.coached': 'Guided',
+      'ai.adviceAction': 'Try this instead',
+      'ai.adviceSteps': 'Three steps for today',
+      'ai.adviceMetric': 'Progress signal',
+      'ai.adviceReady': 'Expert guidance added.',
+      'ai.adviceTargetMissing': 'This weakness no longer exists; guidance was not saved.',
+      'ai.advicePromptBefore': 'You are a behavior-change coach. Give empathetic, practical guidance for the weakness below. Output only one json code block, with no explanation. Object fields: why (one sentence on why change is hard), action (a specific replacement behavior), habit (a micro-habit under two minutes daily), steps (exactly three steps doable today), metric (one observable sign of progress). Keep it small, concrete, realistic, and nonjudgmental. Weakness:',
       'ai.promptBefore': 'Turn the sentence below into a structured draft for my "Self Management" plugin. Output ONLY one ```json code block, no explanation or extra text. JSON shape: {"weaknesses":[{"title":"","note":"","trigger":"","action":"","severity":2}],"learning":[{"title":"","goal":"","resource":"","note":"","progress":0}],"todos":[{"title":"","priority":"normal","due":""}]}. Rules: only include categories the sentence is really about, leave the others empty; severity 3 is worst and 1 is mildest; priority is high/normal/low; due is YYYY-MM-DD only when a date is mentioned, otherwise an empty string. Description:',
     }
 
@@ -390,6 +410,8 @@ window.__ModuleLoader__.load({
       return {
         prompt: raw.prompt.slice(0, 2000),
         stage,
+        kind: raw.kind === 'advice' ? 'advice' : 'draft',
+        weaknessId: typeof raw.weaknessId === 'string' ? raw.weaknessId : null,
         at: Number(raw.at) || Date.now(),
         sinceSeq: Math.max(0, Number(raw.sinceSeq) || 0),
         sinceText: typeof raw.sinceText === 'string' ? raw.sinceText.slice(0, 20000) : '',
@@ -426,6 +448,24 @@ window.__ModuleLoader__.load({
       return numeric === 1 || numeric === 3 ? numeric : 2
     }
 
+    function normalizeAdvice(raw) {
+      if (!raw || typeof raw !== 'object') return null
+      const steps = asArray(raw.steps)
+        .filter((step) => typeof step === 'string' && step.trim())
+        .slice(0, 5)
+        .map((step) => step.trim().slice(0, 200))
+      const advice = {
+        why: text(raw.why, 300),
+        action: text(raw.action, 200),
+        habit: text(raw.habit, 200),
+        metric: text(raw.metric, 200),
+        steps,
+        at: typeof raw.at === 'string' ? raw.at : new Date().toISOString(),
+      }
+      if (!advice.action && !advice.habit && !steps.length && !advice.why && !advice.metric) return null
+      return advice
+    }
+
     function capList(list, cap) {
       return list.length > cap ? list.slice(0, cap) : list
     }
@@ -454,6 +494,7 @@ window.__ModuleLoader__.load({
               trigger: text(item.trigger),
               action: text(item.action),
               severity: normalizeSeverity(item.severity),
+              advice: normalizeAdvice(item.advice),
               createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
               reviews: asArray(item.reviews)
                 .filter((review) => review && typeof review.at === 'string')
@@ -962,13 +1003,15 @@ window.__ModuleLoader__.load({
     // picks the structured JSON out of the assistant reply. Nothing reaches
     // the real lists until the user confirms the draft in the panel.
     // ---------------------------------------------------------------------
-    function beginAiRequest(prompt) {
+    function beginAiRequest(prompt, kind, weaknessId) {
       mutate((data) => ({
         ...data,
         ai: {
           request: {
             prompt: prompt.trim().slice(0, 2000),
             stage: 'pending',
+            kind: kind === 'advice' ? 'advice' : 'draft',
+            weaknessId: typeof weaknessId === 'string' ? weaknessId : null,
             at: Date.now(),
             sinceSeq: 0,
             sinceText: '',
@@ -977,6 +1020,26 @@ window.__ModuleLoader__.load({
           draft: null,
         },
       }))
+    }
+
+    function applyAiAdvice(weaknessId, advice) {
+      const cleaned = normalizeAdvice(advice)
+      if (!cleaned) {
+        failAiRequest()
+        return false
+      }
+      let applied = false
+      mutate((data) => ({
+        ...data,
+        weaknesses: data.weaknesses.map((item) => {
+          if (item.id !== weaknessId) return item
+          applied = true
+          return { ...item, advice: cleaned, action: item.action || cleaned.action }
+        }),
+        ai: null,
+      }))
+      notify(tt(applied ? 'ai.adviceReady' : 'ai.adviceTargetMissing'))
+      return applied
     }
 
     function markAiRequestSent(sinceSeq, sinceText) {
@@ -1069,6 +1132,15 @@ window.__ModuleLoader__.load({
       return tt('ai.promptBefore') + '\n' + sentence.trim() + '\n'
     }
 
+    function buildAdvicePrompt(item) {
+      const details = [
+        item.title,
+        item.trigger ? tt('weakness.triggerLabel') + ': ' + item.trigger : '',
+        item.note ? tt('weakness.noteLabel') + ': ' + item.note : '',
+      ].filter(Boolean).join('\n')
+      return tt('ai.advicePromptBefore') + '\n' + details + '\n'
+    }
+
     function extractAiPayload(replyText) {
       if (!replyText || typeof replyText !== 'string') return null
       let candidate = replyText
@@ -1080,7 +1152,10 @@ window.__ModuleLoader__.load({
       try {
         const parsed = JSON.parse(candidate.slice(start, end + 1))
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-        return normalizeDraftItems(parsed)
+        const draft = normalizeDraftItems(parsed)
+        if (draft) return draft
+        const advice = normalizeAdvice(parsed)
+        return advice ? { kind: 'advice', advice } : null
       } catch {
         return null
       }
@@ -1455,8 +1530,9 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function WeaknessCard({ item, t, onEdit, onDelete, onRecord }) {
+    function WeaknessCard({ item, t, onEdit, onDelete, onRecord, onCoach }) {
       const lastReview = item.reviews.length ? item.reviews[item.reviews.length - 1] : null
+      const hasGuidance = Boolean(item.advice || item.action)
       return h(
         'article',
         { className: 'sm-card sm-entity sm-entity-red' },
@@ -1468,17 +1544,56 @@ window.__ModuleLoader__.load({
             'div',
             { className: 'sm-entity-chips' },
             h(Chip, { tone: severityTone(item.severity) }, t(severityKey(item.severity))),
+            item.advice ? h(Chip, { tone: 'brand' }, t('weakness.coached')) : null,
             h(Chip, null, t('today.reviewPrefix') + ' ' + item.reviews.length + ' ' + t('today.reviewSuffix')),
           ),
         ),
         item.note ? h('p', { className: 'sm-entity-note' }, item.note) : null,
         item.trigger ? h('div', { className: 'sm-kv' }, h('b', null, t('weakness.triggerLabel')), ' ' + item.trigger) : null,
-        item.action ? h('div', { className: 'sm-kv' }, h('b', null, t('weakness.actionLabel')), ' ' + item.action) : null,
+        item.advice
+          ? h(
+              'div',
+              { className: 'sm-advice' },
+              item.advice.why ? h('p', { className: 'sm-advice-why' }, item.advice.why) : null,
+              item.advice.habit || item.advice.action || item.action
+                ? h(
+                    'div',
+                    { className: 'sm-advice-action' },
+                    h('b', null, t('ai.adviceAction')),
+                    ' ',
+                    item.advice.habit || item.advice.action || item.action,
+                  )
+                : null,
+              item.advice.steps.length
+                ? h(
+                    'div',
+                    { className: 'sm-advice-steps' },
+                    h('div', { className: 'sm-advice-steps-title' }, t('ai.adviceSteps')),
+                    item.advice.steps.map((step, index) =>
+                      h(
+                        'div',
+                        { key: index, className: 'sm-advice-step' },
+                        h('span', { className: 'sm-advice-step-no' }, String(index + 1)),
+                        h('span', null, step),
+                      ),
+                    ),
+                  )
+                : null,
+              item.advice.metric
+                ? h('div', { className: 'sm-advice-metric' }, h('b', null, t('ai.adviceMetric')), ' ', item.advice.metric)
+                : null,
+            )
+          : item.action
+            ? h('div', { className: 'sm-kv' }, h('b', null, t('weakness.actionLabel')), ' ' + item.action)
+            : null,
         lastReview ? h('div', { className: 'sm-kv' }, h('b', null, t('weakness.reviewLabel')), ' ' + formatDate(lastReview.at)) : null,
         h(
           'div',
           { className: 'sm-entity-actions' },
-          h(Btn, { variant: 'primary', onClick: () => onRecord(item.id) }, t('weakness.record')),
+          hasGuidance
+            ? h(Btn, { variant: 'primary', onClick: () => onRecord(item.id) }, t('weakness.record'))
+            : h(Btn, { variant: 'primary', onClick: () => onCoach(item) }, t('ai.coach')),
+          hasGuidance ? h(Btn, { variant: 'ghost', onClick: () => onCoach(item) }, t('ai.recoach')) : null,
           h(Btn, { variant: 'ghost', onClick: () => onEdit(item) }, t('common.edit')),
           h(Btn, { variant: 'ghost', onClick: () => onDelete(item) }, t('common.delete')),
         ),
@@ -1639,12 +1754,13 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------------
     // Tabs
     // ---------------------------------------------------------------------
-    function TodayTab({ data, t, offset, onRotate, onCheckIn, onRecord, onProgress, onAddWeakness, onAddTodo, onAddLearning, onOpenTab, onToggleTodo }) {
+    function TodayTab({ data, t, offset, onRotate, onCheckIn, onRecord, onProgress, onAddWeakness, onAddTodo, onAddLearning, onOpenTab, onToggleTodo, onCoach }) {
       const checkedIn = data.checkins.lastDate === dayKey()
       const reminder = pickReminder(data, offset)
       const counts = todayCounts(data)
       const todos = activeTodos(data).slice(0, 5)
       const learning = focusLearning(data)
+      const reminderAction = reminder ? (reminder.advice && (reminder.advice.action || reminder.advice.steps[0])) || reminder.action : ''
       const focusTodo = topFocusTodo(data)
       const focus = focusTodo
         ? { kind: 'todo', todo: focusTodo }
@@ -1688,16 +1804,25 @@ window.__ModuleLoader__.load({
           h(Chip, { tone: severityTone(focus.weakness.severity) }, t(severityKey(focus.weakness.severity))),
           focus.weakness.trigger ? h(Chip, null, focus.weakness.trigger) : null,
         )
-        focusAction = focus.weakness.action
-          ? h('div', { className: 'sm-focus-action' }, h('b', null, t('weakness.actionLabel')), ' ' + focus.weakness.action)
-          : null
-        focusActions = h(
-          'div',
-          { className: 'sm-focus-actions' },
-          h(Btn, { variant: 'primary', onClick: () => onRecord(focus.weakness.id) }, t('today.record')),
-          h(Btn, { onClick: onRotate }, t('today.rotate')),
-          h('span', { className: 'sm-muted' }, t('today.reviewPrefix') + ' ' + focus.weakness.reviews.length + ' ' + t('today.reviewSuffix')),
-        )
+        const nextStep = focus.weakness.advice?.steps[0]
+        const suggestedAction = focus.weakness.advice?.action || focus.weakness.action || nextStep
+        focusAction = suggestedAction
+          ? h('div', { className: 'sm-focus-action' }, h('b', null, t('ai.adviceAction')), ' ' + suggestedAction)
+          : h('div', { className: 'sm-focus-action' }, t('ai.coach'))
+        focusActions = focus.weakness.advice
+          ? h(
+              'div',
+              { className: 'sm-focus-actions' },
+              h(Btn, { variant: 'primary', onClick: () => onRecord(focus.weakness.id) }, t('today.record')),
+              h(Btn, { onClick: onRotate }, t('today.rotate')),
+              h('span', { className: 'sm-muted' }, t('today.reviewPrefix') + ' ' + focus.weakness.reviews.length + ' ' + t('today.reviewSuffix')),
+            )
+          : h(
+              'div',
+              { className: 'sm-focus-actions' },
+              h(Btn, { variant: 'primary', onClick: () => onCoach(focus.weakness) }, t('ai.coach')),
+              h(Btn, { onClick: onRotate }, t('today.rotate')),
+            )
       } else if (focus && focus.kind === 'learning') {
         focusTitle = focus.learning.title
         focusMeta = h('div', { className: 'sm-focus-meta' }, h(Chip, null, t('learning.progressLabel') + ' ' + focus.learning.progress + '%'))
@@ -1788,7 +1913,7 @@ window.__ModuleLoader__.load({
                       reminder.trigger ? h(Chip, null, reminder.trigger) : null,
                     ),
                   ),
-                  reminder.action ? h('div', { className: 'sm-kv' }, h('b', null, t('weakness.actionLabel')), ' ' + reminder.action) : null,
+                  reminderAction ? h('div', { className: 'sm-kv' }, h('b', null, t('ai.adviceAction')), ' ' + reminderAction) : null,
                   h(
                     'div',
                     { className: 'sm-reminder-actions' },
@@ -1832,7 +1957,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function WeaknessTab({ data, t, onAdd, onEdit, onDelete, onRecord }) {
+    function WeaknessTab({ data, t, onAdd, onEdit, onDelete, onRecord, onCoach }) {
       return h(
         'div',
         { className: 'sm-content' },
@@ -1845,11 +1970,11 @@ window.__ModuleLoader__.load({
         data.weaknesses.length === 0
           ? h(
               'div',
-              { className: 'sm-card sm-empty' },
+              { className: 'sm-card sm-card-red sm-empty' },
               h('p', null, t('weakness.empty')),
               h(Btn, { variant: 'primary', onClick: onAdd }, '+ ' + t('weakness.add')),
             )
-          : data.weaknesses.map((item) => h(WeaknessCard, { key: item.id, item, t, onEdit, onDelete, onRecord })),
+          : data.weaknesses.map((item) => h(WeaknessCard, { key: item.id, item, t, onEdit, onDelete, onRecord, onCoach })),
       )
     }
 
@@ -1866,7 +1991,7 @@ window.__ModuleLoader__.load({
         data.learning.length === 0
           ? h(
               'div',
-              { className: 'sm-card sm-empty' },
+              { className: 'sm-card sm-card-green sm-empty' },
               h('p', null, t('learning.empty')),
               h(Btn, { variant: 'primary', onClick: onAdd }, '+ ' + t('learning.add')),
             )
@@ -1904,7 +2029,7 @@ window.__ModuleLoader__.load({
         ),
         h(
           'form',
-          { className: 'sm-card sm-add-row', onSubmit: submit },
+          { className: 'sm-card sm-card-blue sm-add-row', onSubmit: submit },
           h('input', {
             className: 'sm-input sm-add-title',
             value: title,
@@ -1925,7 +2050,7 @@ window.__ModuleLoader__.load({
         ),
         h(
           'div',
-          { className: 'sm-card sm-list' },
+          { className: 'sm-card sm-card-blue sm-list' },
           visible.length === 0
             ? h('div', { className: 'sm-empty' }, t('todo.empty'))
             : sortTodos(visible).map((todo) => h(TodoRow, { key: todo.id, todo, t, onToggle: onToggle, onEdit, onDelete })),
@@ -1960,7 +2085,7 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (requestStage !== 'pending' || !inputActions || !ai || !ai.request) return
         try {
-          inputActions.setDraft(buildAiPrompt(ai.request.prompt))
+          inputActions.setDraft(ai.request.kind === 'advice' ? ai.request.prompt : buildAiPrompt(ai.request.prompt))
         } catch {
           failAiRequest()
           return
@@ -1990,7 +2115,12 @@ window.__ModuleLoader__.load({
         if (draftNewer) {
           const payload = extractAiPayload(draft.text)
           if (payload) {
-            saveAiDraft(payload)
+            if (payload.kind === 'advice') {
+              if (request.kind === 'advice' && request.weaknessId) applyAiAdvice(request.weaknessId, payload.advice)
+              else failAiRequest()
+            } else {
+              saveAiDraft(payload)
+            }
             return
           }
           if (requestStage === 'sent' && draft.text.includes('{')) {
@@ -2142,6 +2272,12 @@ window.__ModuleLoader__.load({
         notify(tt('ai.sent'))
       }
 
+      const startAiAdvice = (item) => {
+        beginAiRequest(buildAdvicePrompt(item), 'advice', item.id)
+        goConversation()
+        notify(tt('ai.sent'))
+      }
+
       const tabs = [
         { id: 'today', label: t('tab.today') },
         { id: 'weaknesses', label: t('tab.weaknesses'), count: data.weaknesses.length },
@@ -2164,6 +2300,7 @@ window.__ModuleLoader__.load({
           onAddLearning: () => setDialog({ type: 'learning', item: null }),
           onOpenTab: setTab,
           onToggleTodo: toggleTodo,
+          onCoach: startAiAdvice,
         })
       } else if (tab === 'weaknesses') {
         body = h(WeaknessTab, {
@@ -2173,6 +2310,7 @@ window.__ModuleLoader__.load({
           onEdit: (item) => setDialog({ type: 'weakness', item }),
           onDelete: requestDeleteWeakness,
           onRecord: recordWeaknessImprovement,
+          onCoach: startAiAdvice,
         })
       } else if (tab === 'learning') {
         body = h(LearningTab, {
@@ -2487,6 +2625,27 @@ window.__ModuleLoader__.load({
 .sm-todo-today { --sm-accent: var(--dsw-alias-state-warn-primary); }
 .sm-todo-important { --sm-accent: var(--dsw-alias-brand-primary); }
 .sm-ai-card { background: linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, transparent), transparent 60%); }
+/* ---- v4: saturated category fills + expert advice block ---- */
+.sm-card-red { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, var(--dsw-alias-bg-base)); border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 40%, transparent); border-top-width: 4px; }
+.sm-card-green { background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, var(--dsw-alias-bg-base)); border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 40%, transparent); border-top-width: 4px; }
+.sm-card-blue { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, var(--dsw-alias-bg-base)); border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 40%, transparent); border-top-width: 4px; }
+.sm-entity-red { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, var(--dsw-alias-bg-base)); border-left-width: 4px; }
+.sm-entity-green { background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, var(--dsw-alias-bg-base)); border-left-width: 4px; }
+.sm-stat { background: color-mix(in srgb, var(--sm-accent) 18%, var(--dsw-alias-bg-base)); border-color: color-mix(in srgb, var(--sm-accent) 45%, transparent); }
+.sm-focus-card { background: linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent), transparent 65%); }
+.sm-ai-card { background: linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent), transparent 65%); }
+.sm-todo-overdue { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent); }
+.sm-todo-today { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 8%, transparent); }
+.sm-todo-important { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, transparent); }
+.sm-advice { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent); }
+.sm-advice-why { margin: 0; font-size: 13.5px; color: var(--dsw-alias-label-secondary); }
+.sm-advice-action { font-size: 14px; }
+.sm-advice-action b { font-weight: 600; color: var(--dsw-alias-state-error-primary); margin-right: 6px; }
+.sm-advice-steps-title { font-size: 12.5px; font-weight: 600; color: var(--dsw-alias-label-secondary); margin-bottom: 4px; }
+.sm-advice-step { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; }
+.sm-advice-step-no { flex: none; width: 20px; height: 20px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--dsw-alias-bg-base); background: var(--dsw-alias-state-error-primary); }
+.sm-advice-metric { font-size: 13px; color: var(--dsw-alias-label-secondary); }
+.sm-advice-metric b { color: var(--dsw-alias-label-primary); font-weight: 600; margin-right: 6px; }
 @media (max-width: 720px) {
   .sm-root { padding: 0 16px 36px; }
   .sm-header { flex-direction: column; }
